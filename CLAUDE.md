@@ -10,7 +10,8 @@ Cell-based GUI library with C ABI. Like ncurses but graphical.
 
 ```
 zig build test      # unit tests
-zig build run       # run example
+zig build run       # run demo
+zig build editor    # run editor example
 ```
 
 ## Structure
@@ -18,8 +19,11 @@ zig build run       # run example
 ```
 src/
   linopic.zig       # library
-  main.zig          # example
-  font.ttf          # embedded JetBrains Mono
+  grid.zig          # grid/color/line types
+  DepartureMono-Regular.otf  # embedded font
+examples/
+  demo.zig          # simple demo
+  editor.zig        # text editor example
 ```
 
 ## API (Zig)

@@ -1,11 +1,32 @@
 const std = @import("std");
 const c = @cImport(@cInclude("raylib.h"));
 const grid = @import("grid.zig");
+const lines = @import("lines.zig");
 
 pub const Grid = grid.Grid;
 pub const Color = grid.Color;
 pub const Line = grid.Line;
+pub const MouseEvt = grid.MouseEvt;
+pub const KeyState = grid.KeyState;
+// LineStyle flags
+pub const LINE_2SEG = grid.LINE_2SEG;
+pub const LINE_3SEG = grid.LINE_3SEG;
+pub const LINE_CORNER_HARD = grid.LINE_CORNER_HARD;
+pub const LINE_CORNER_NONE = grid.LINE_CORNER_NONE;
+pub const LINE_BIAS_START = grid.LINE_BIAS_START;
+pub const LINE_BIAS_END = grid.LINE_BIAS_END;
+// Key constants
+pub const KEY_SHIFT = grid.KEY_SHIFT;
+pub const KEY_CTRL = grid.KEY_CTRL;
+pub const KEY_ALT = grid.KEY_ALT;
+pub const KEY_SUPER = grid.KEY_SUPER;
+pub const KEY_ENTER = grid.KEY_ENTER;
+pub const KEY_BKSP = grid.KEY_BKSP;
+pub const KEY_SPACE = grid.KEY_SPACE;
+pub const KEY_ESC = grid.KEY_ESC;
 pub const rgb = grid.rgb;
+pub const rgba = grid.rgba;
+pub const hex = grid.hex;
 pub const lnpc_grid = grid.lnpc_grid;
 pub const lnpc_nogrid = grid.lnpc_nogrid;
 pub const lnpc_bg = grid.lnpc_bg;
@@ -16,28 +37,47 @@ pub const lnpc_line = grid.lnpc_line;
 pub const lnpc_noline = grid.lnpc_noline;
 
 const alloc = std.heap.page_allocator;
-const font_data = @embedFile("font.ttf");
+const font_data = @embedFile("DepartureMono-Regular.otf");
 
 pub const Window = struct {
     grid: *Grid,
     cell_width: u32,
     cell_height: u32,
     font: c.Font,
+    font_size: u32,
+    baseline_offset: f32,
 };
 
 pub export fn lnpc_window(font_size: u32, g: *Grid) ?*Window {
-    const cell_width = font_size * 6 / 10;
-    const cell_height = font_size;
-
+    // Initialize window
+    c.SetConfigFlags(c.FLAG_WINDOW_HIGHDPI | c.FLAG_MSAA_4X_HINT);
     c.InitWindow(
-        @intCast(g.width * cell_width),
-        @intCast(g.height * cell_height),
+        @intCast(g.width * font_size * 6 / 10),
+        @intCast(g.height * font_size),
         "linopic",
     );
     c.SetTargetFPS(60);
 
-    const font = c.LoadFontFromMemory(".ttf", font_data, font_data.len, @intCast(font_size), null, 0);
-    c.SetTextureFilter(font.texture, c.TEXTURE_FILTER_BILINEAR);
+    // Load font at 2x size for better glyph quality, then render at target size
+    const internal_size: c_int = @intCast(font_size * 2);
+    const font = c.LoadFontFromMemory(".otf", font_data, font_data.len, internal_size, null, 0);
+
+    // Calculate cell dimensions based on requested font size (not internal size)
+    const scale_factor: f32 = @as(f32, @floatFromInt(font_size)) / @as(f32, @floatFromInt(font.baseSize));
+    const glyph_info = c.GetGlyphInfo(font, 'M');
+    const raw_advance: f32 = if (glyph_info.advanceX > 0) @floatFromInt(glyph_info.advanceX) else @as(f32, @floatFromInt(font.baseSize)) * 0.6;
+    const cell_width: u32 = @intFromFloat(raw_advance * scale_factor);
+    const cell_height: u32 = font_size;
+
+    // Resize window to match cell dimensions
+    c.SetWindowSize(@intCast(g.width * cell_width), @intCast(g.height * cell_height));
+
+    // Store cell dimensions on grid for mouse coordinate conversion
+    g.cell_width = cell_width;
+    g.cell_height = cell_height;
+
+    // Use trilinear filtering for smooth downscaled text
+    c.SetTextureFilter(font.texture, c.TEXTURE_FILTER_TRILINEAR);
 
     const window = alloc.create(Window) catch return null;
     window.* = .{
@@ -45,6 +85,8 @@ pub export fn lnpc_window(font_size: u32, g: *Grid) ?*Window {
         .cell_width = cell_width,
         .cell_height = cell_height,
         .font = font,
+        .font_size = font_size,
+        .baseline_offset = 0,
     };
     return window;
 }
@@ -56,13 +98,56 @@ pub export fn lnpc_nowindow(window: ?*Window) void {
     alloc.destroy(w);
 }
 
+pub export fn lnpc_mouse(g: *Grid, button: c_int) grid.MouseEvt {
+    const cw = g.cell_width;
+    const ch = g.cell_height;
+    const mouse_x = c.GetMouseX();
+    const mouse_y = c.GetMouseY();
+
+    const ray_button: c_int = switch (button) {
+        0 => c.MOUSE_BUTTON_LEFT,
+        1 => c.MOUSE_BUTTON_RIGHT,
+        2 => c.MOUSE_BUTTON_MIDDLE,
+        else => c.MOUSE_BUTTON_LEFT,
+    };
+
+    return .{
+        .x = if (cw > 0) @divFloor(mouse_x, @as(c_int, @intCast(cw))) else 0,
+        .y = if (ch > 0) @divFloor(mouse_y, @as(c_int, @intCast(ch))) else 0,
+        .is_down = c.IsMouseButtonDown(ray_button),
+        .is_pressed = c.IsMouseButtonPressed(ray_button),
+        .is_released = c.IsMouseButtonReleased(ray_button),
+    };
+}
+
+pub export fn lnpc_key(key: u8) grid.KeyState {
+    const ray_key: c_int = switch (key) {
+        grid.KEY_SHIFT => c.KEY_LEFT_SHIFT,
+        grid.KEY_CTRL => c.KEY_LEFT_CONTROL,
+        grid.KEY_ALT => c.KEY_LEFT_ALT,
+        grid.KEY_SUPER => c.KEY_LEFT_SUPER,
+        grid.KEY_ENTER => c.KEY_ENTER,
+        grid.KEY_BKSP => c.KEY_BACKSPACE,
+        grid.KEY_SPACE => c.KEY_SPACE,
+        grid.KEY_ESC => c.KEY_ESCAPE,
+        else => @as(c_int, key),
+    };
+
+    return .{
+        .is_down = c.IsKeyDown(ray_key),
+        .is_pressed = c.IsKeyPressed(ray_key),
+        .is_released = c.IsKeyReleased(ray_key),
+    };
+}
+
 pub export fn lnpc_draw(window: *Window) bool {
     const g = window.grid;
     const cw = window.cell_width;
     const ch = window.cell_height;
-    const fsz: f32 = @floatFromInt(ch);
     const cwf: f32 = @floatFromInt(cw);
     const chf: f32 = @floatFromInt(ch);
+    // Render at requested font size (font is loaded at 2x for quality)
+    const fsz: f32 = @floatFromInt(window.font_size);
 
     c.BeginDrawing();
     defer c.EndDrawing();
@@ -92,45 +177,10 @@ pub export fn lnpc_draw(window: *Window) bool {
 
     for (g.lines) |line| {
         if (!line.active) continue;
-        drawBezier(line, cwf, chf);
+        lines.draw(line, cwf, chf);
     }
 
     return c.WindowShouldClose();
-}
-
-fn drawBezier(line: grid.Line, cw: f32, ch: f32) void {
-    const ax: f32 = (@as(f32, @floatFromInt(line.ax)) + 0.5) * cw;
-    const ay: f32 = (@as(f32, @floatFromInt(line.ay)) + 0.5) * ch;
-    const bx: f32 = (@as(f32, @floatFromInt(line.bx)) + 0.5) * cw;
-    const by: f32 = (@as(f32, @floatFromInt(line.by)) + 0.5) * ch;
-
-    const dx = bx - ax;
-    const dy = by - ay;
-    const len = @sqrt(dx * dx + dy * dy);
-    if (len == 0) return;
-
-    const nx = -dy / len;
-    const ny = dx / len;
-
-    const bend: f32 = @as(f32, @floatFromInt(line.bendiness)) / 127.0;
-    const offset = bend * len * 0.5;
-
-    const cx = (ax + bx) / 2 + nx * offset;
-    const cy = (ay + by) / 2 + ny * offset;
-
-    const steps: u32 = @max(16, @as(u32, @intFromFloat(len / 4)));
-    var prev_x = ax;
-    var prev_y = ay;
-
-    for (1..steps + 1) |i| {
-        const t: f32 = @as(f32, @floatFromInt(i)) / @as(f32, @floatFromInt(steps));
-        const inv = 1 - t;
-        const px = inv * inv * ax + 2 * inv * t * cx + t * t * bx;
-        const py = inv * inv * ay + 2 * inv * t * cy + t * t * by;
-        c.DrawLineEx(.{ .x = prev_x, .y = prev_y }, .{ .x = px, .y = py }, 2, ray(line.color));
-        prev_x = px;
-        prev_y = py;
-    }
 }
 
 fn ray(color: Color) c.Color {
@@ -138,6 +188,6 @@ fn ray(color: Color) c.Color {
         .r = @truncate(color >> 16),
         .g = @truncate(color >> 8),
         .b = @truncate(color),
-        .a = 255,
+        .a = @truncate(color >> 24),
     };
 }

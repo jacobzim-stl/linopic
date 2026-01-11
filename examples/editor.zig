@@ -55,13 +55,13 @@ pub fn main() !void {
     initBuffer();
 
     const stdin_fd: c_int = 0;
-    const stdout = std.io.getStdOut().writer();
+    const stdout: std.fs.File = .{ .handle = std.posix.STDOUT_FILENO };
 
     const old_flags = libc.fcntl(stdin_fd, libc.F_GETFL, @as(c_int, 0));
     _ = libc.fcntl(stdin_fd, libc.F_SETFL, old_flags | libc.O_NONBLOCK);
     defer _ = libc.fcntl(stdin_fd, libc.F_SETFL, old_flags);
 
-    try stdout.print("Commands: dbg_showcells, quit\n> ", .{});
+    try stdout.writeAll("Commands: dbg_showcells, quit\n> ");
 
     var repl_buf: [64]u8 = undefined;
     var repl_len: usize = 0;
@@ -81,7 +81,7 @@ pub fn main() !void {
                 handleCommand(cmd);
                 std.mem.copyForwards(u8, &repl_buf, repl_buf[nl + 1 .. repl_len]);
                 repl_len -= nl + 1;
-                stdout.print("> ", .{}) catch {};
+                stdout.writeAll("> ") catch {};
             }
         }
     }

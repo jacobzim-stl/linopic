@@ -4,12 +4,44 @@ const alloc = std.heap.page_allocator;
 
 pub const Color = u32;
 
+// LineStyle flags (combinable via bitwise OR)
+pub const LINE_2SEG: u32 = 0x00000001; // 2 segment line, run then rise
+pub const LINE_3SEG: u32 = 0x00000002; // 3 segment line, run then rise then run
+pub const LINE_CORNER_HARD: u32 = 0x00000010; // hard-edges
+pub const LINE_CORNER_NONE: u32 = 0x00000020; // no corners, smooth bend
+pub const LINE_BIAS_START: u32 = 0x00000100; // bias towards startpoint
+pub const LINE_BIAS_END: u32 = 0x0000c000; // bias towards endpoint
+
+pub const MouseEvt = extern struct {
+    x: i32,
+    y: i32,
+    is_down: bool,
+    is_pressed: bool,
+    is_released: bool,
+};
+
+pub const KeyState = extern struct {
+    is_down: bool,
+    is_pressed: bool,
+    is_released: bool,
+};
+
+// Key constants
+pub const KEY_SHIFT: u8 = 0x01;
+pub const KEY_CTRL: u8 = 0x02;
+pub const KEY_ALT: u8 = 0x04;
+pub const KEY_SUPER: u8 = 0x08;
+pub const KEY_ENTER: u8 = 0x10;
+pub const KEY_BKSP: u8 = 0x20;
+pub const KEY_SPACE: u8 = 0x40;
+pub const KEY_ESC: u8 = 0x80;
+
 pub const Line = struct {
     ax: u32,
     ay: u32,
     bx: u32,
     by: u32,
-    bendiness: i8,
+    style: u32,
     color: Color,
     active: bool,
 };
@@ -17,6 +49,8 @@ pub const Line = struct {
 pub const Grid = struct {
     width: u32,
     height: u32,
+    cell_width: u32,
+    cell_height: u32,
     chars: []u32,
     fgs: []Color,
     bgs: []Color,
@@ -24,7 +58,36 @@ pub const Grid = struct {
 };
 
 pub export fn rgb(r: u8, g: u8, b: u8) Color {
-    return @as(u32, r) << 16 | @as(u32, g) << 8 | b;
+    return 0xFF000000 | @as(u32, r) << 16 | @as(u32, g) << 8 | b;
+}
+
+pub export fn rgba(r: u8, g: u8, b: u8, a: u8) Color {
+    return @as(u32, a) << 24 | @as(u32, r) << 16 | @as(u32, g) << 8 | b;
+}
+
+pub export fn hex(str: [*:0]const u8) Color {
+    var i: usize = 0;
+    if (str[0] == '#') i = 1;
+    var result: Color = 0;
+    var digit_count: usize = 0;
+    while (str[i] != 0 and digit_count < 8) : (i += 1) {
+        const char = str[i];
+        const digit: u8 = if (char >= '0' and char <= '9')
+            char - '0'
+        else if (char >= 'a' and char <= 'f')
+            char - 'a' + 10
+        else if (char >= 'A' and char <= 'F')
+            char - 'A' + 10
+        else
+            break;
+        result = (result << 4) | digit;
+        digit_count += 1;
+    }
+    // Add full alpha for 6-digit (RGB) hex codes
+    if (digit_count == 6) {
+        result |= 0xFF000000;
+    }
+    return result;
 }
 
 const MAX_LINES = 256;
@@ -50,7 +113,7 @@ pub export fn lnpc_grid(w: u32, h: u32) ?*Grid {
         alloc.free(bgs);
         return null;
     };
-    @memset(lines, Line{ .ax = 0, .ay = 0, .bx = 0, .by = 0, .bendiness = 0, .color = 0, .active = false });
+    @memset(lines, Line{ .ax = 0, .ay = 0, .bx = 0, .by = 0, .style = 0, .color = 0, .active = false });
     const grid = alloc.create(Grid) catch {
         alloc.free(chars);
         alloc.free(fgs);
@@ -58,7 +121,7 @@ pub export fn lnpc_grid(w: u32, h: u32) ?*Grid {
         alloc.free(lines);
         return null;
     };
-    grid.* = .{ .width = w, .height = h, .chars = chars, .fgs = fgs, .bgs = bgs, .lines = lines };
+    grid.* = .{ .width = w, .height = h, .cell_width = 0, .cell_height = 0, .chars = chars, .fgs = fgs, .bgs = bgs, .lines = lines };
     return grid;
 }
 
@@ -71,10 +134,10 @@ pub export fn lnpc_nogrid(grid: ?*Grid) void {
     alloc.destroy(g);
 }
 
-pub export fn lnpc_line(grid: *Grid, ax: u32, ay: u32, bx: u32, by: u32, bendiness: i8, color: Color) u32 {
+pub export fn lnpc_line(grid: *Grid, ax: u32, ay: u32, bx: u32, by: u32, color: Color, style: u32) u32 {
     for (grid.lines, 0..) |*line, i| {
         if (!line.active) {
-            line.* = .{ .ax = ax, .ay = ay, .bx = bx, .by = by, .bendiness = bendiness, .color = color, .active = true };
+            line.* = .{ .ax = ax, .ay = ay, .bx = bx, .by = by, .style = style, .color = color, .active = true };
             return @intCast(i);
         }
     }
@@ -116,19 +179,31 @@ test "grid create and destroy" {
 }
 
 test "rgb" {
-    try std.testing.expectEqual(@as(Color, 0xFF0000), rgb(255, 0, 0));
-    try std.testing.expectEqual(@as(Color, 0x00FF00), rgb(0, 255, 0));
-    try std.testing.expectEqual(@as(Color, 0x0000FF), rgb(0, 0, 255));
-    try std.testing.expectEqual(@as(Color, 0x123456), rgb(0x12, 0x34, 0x56));
+    try std.testing.expectEqual(@as(Color, 0xFFFF0000), rgb(255, 0, 0));
+    try std.testing.expectEqual(@as(Color, 0xFF00FF00), rgb(0, 255, 0));
+    try std.testing.expectEqual(@as(Color, 0xFF0000FF), rgb(0, 0, 255));
+    try std.testing.expectEqual(@as(Color, 0xFF123456), rgb(0x12, 0x34, 0x56));
+}
+
+test "rgba" {
+    try std.testing.expectEqual(@as(Color, 0x80FF0000), rgba(255, 0, 0, 0x80));
+    try std.testing.expectEqual(@as(Color, 0x00123456), rgba(0x12, 0x34, 0x56, 0x00));
+}
+
+test "hex" {
+    try std.testing.expectEqual(@as(Color, 0xFFFF0000), hex("FF0000"));
+    try std.testing.expectEqual(@as(Color, 0xFFFF0000), hex("#FF0000"));
+    try std.testing.expectEqual(@as(Color, 0xAABBCCDD), hex("AABBCCDD"));
 }
 
 test "char" {
     const g = lnpc_grid(10, 10) orelse return error.Failed;
     defer lnpc_nogrid(g);
 
-    lnpc_char(g, 5, 5, 'A', 0xFF0000);
+    const red = rgb(255, 0, 0);
+    lnpc_char(g, 5, 5, 'A', red);
     try std.testing.expectEqual(@as(u32, 'A'), g.chars[55]);
-    try std.testing.expectEqual(@as(Color, 0xFF0000), g.fgs[55]);
+    try std.testing.expectEqual(red, g.fgs[55]);
 
     lnpc_nochar(g, 5, 5);
     try std.testing.expectEqual(@as(u32, 0), g.chars[55]);
@@ -140,8 +215,9 @@ test "bg" {
 
     try std.testing.expectEqual(@as(Color, 0), g.bgs[0]);
 
-    lnpc_bg(g, 0, 0, 0x6496C8);
-    try std.testing.expectEqual(@as(Color, 0x6496C8), g.bgs[0]);
+    const blue = rgb(0x64, 0x96, 0xC8);
+    lnpc_bg(g, 0, 0, blue);
+    try std.testing.expectEqual(blue, g.bgs[0]);
 
     lnpc_nobg(g, 0, 0);
     try std.testing.expectEqual(@as(Color, 0), g.bgs[0]);
