@@ -53,6 +53,26 @@ pub fn build(b: *std.Build) void {
     editor_step.dependOn(&editor_cmd.step);
     editor_cmd.step.dependOn(b.getInstallStep());
 
+    const synth_module = b.createModule(.{
+        .root_source_file = b.path("examples/synth.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{.{ .name = "linopic", .module = linopic }},
+    });
+    synth_module.addSystemIncludePath(.{ .cwd_relative = "/opt/homebrew/include" });
+    synth_module.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/lib" });
+    synth_module.linkSystemLibrary("raylib", .{});
+    const synth = b.addExecutable(.{ .name = "synth", .root_module = synth_module });
+    b.installArtifact(synth);
+
+    const synth_step = b.step("synth", "Build modular synth");
+    synth_step.dependOn(&synth.step);
+
+    const run_synth_step = b.step("run-synth", "Run modular synth");
+    const synth_cmd = b.addRunArtifact(synth);
+    run_synth_step.dependOn(&synth_cmd.step);
+    synth_cmd.step.dependOn(b.getInstallStep());
+
     const unit_tests = b.addTest(.{ .root_module = grid });
     const run_unit_tests = b.addRunArtifact(unit_tests);
     const test_step = b.step("test", "Run unit tests");
