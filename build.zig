@@ -4,6 +4,8 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
+    const raylib = b.dependency("raylib", .{ .target = target, .optimize = optimize }).artifact("raylib");
+
     const grid = b.addModule("grid", .{
         .root_source_file = b.path("src/grid.zig"),
         .target = target,
@@ -15,66 +17,41 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
-    linopic.addSystemIncludePath(.{ .cwd_relative = "/opt/homebrew/include" });
-    linopic.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/lib" });
-    linopic.linkSystemLibrary("raylib", .{});
+    linopic.linkLibrary(raylib);
 
-    const demo_module = b.createModule(.{
-        .root_source_file = b.path("examples/demo.zig"),
-        .target = target,
-        .optimize = optimize,
-        .imports = &.{.{ .name = "linopic", .module = linopic }},
-    });
-    demo_module.addSystemIncludePath(.{ .cwd_relative = "/opt/homebrew/include" });
-    demo_module.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/lib" });
-    demo_module.linkSystemLibrary("raylib", .{});
-    const demo = b.addExecutable(.{ .name = "demo", .root_module = demo_module });
-    b.installArtifact(demo);
+    // Examples
+    inline for (.{
+        .{ "demo", "run", "Run demo" },
+        .{ "editor", "editor", "Run editor" },
+        .{ "synth", "run-synth", "Run synth" },
+    }) |example| {
+        const name, const step_name, const desc = example;
+        const exe = addExample(b, name, target, optimize, linopic, raylib);
+        const run = b.step(step_name, desc);
+        run.dependOn(&b.addRunArtifact(exe).step);
+    }
 
-    const run_step = b.step("run", "Run demo");
-    const run_cmd = b.addRunArtifact(demo);
-    run_step.dependOn(&run_cmd.step);
-    run_cmd.step.dependOn(b.getInstallStep());
-
-    const editor_module = b.createModule(.{
-        .root_source_file = b.path("examples/editor.zig"),
-        .target = target,
-        .optimize = optimize,
-        .imports = &.{.{ .name = "linopic", .module = linopic }},
-    });
-    editor_module.addSystemIncludePath(.{ .cwd_relative = "/opt/homebrew/include" });
-    editor_module.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/lib" });
-    editor_module.linkSystemLibrary("raylib", .{});
-    const editor = b.addExecutable(.{ .name = "editor", .root_module = editor_module });
-    b.installArtifact(editor);
-
-    const editor_step = b.step("editor", "Run editor");
-    const editor_cmd = b.addRunArtifact(editor);
-    editor_step.dependOn(&editor_cmd.step);
-    editor_cmd.step.dependOn(b.getInstallStep());
-
-    const synth_module = b.createModule(.{
-        .root_source_file = b.path("examples/synth.zig"),
-        .target = target,
-        .optimize = optimize,
-        .imports = &.{.{ .name = "linopic", .module = linopic }},
-    });
-    synth_module.addSystemIncludePath(.{ .cwd_relative = "/opt/homebrew/include" });
-    synth_module.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/lib" });
-    synth_module.linkSystemLibrary("raylib", .{});
-    const synth = b.addExecutable(.{ .name = "synth", .root_module = synth_module });
-    b.installArtifact(synth);
-
-    const synth_step = b.step("synth", "Build modular synth");
-    synth_step.dependOn(&synth.step);
-
-    const run_synth_step = b.step("run-synth", "Run modular synth");
-    const synth_cmd = b.addRunArtifact(synth);
-    run_synth_step.dependOn(&synth_cmd.step);
-    synth_cmd.step.dependOn(b.getInstallStep());
-
-    const unit_tests = b.addTest(.{ .root_module = grid });
-    const run_unit_tests = b.addRunArtifact(unit_tests);
+    // Tests
     const test_step = b.step("test", "Run unit tests");
-    test_step.dependOn(&run_unit_tests.step);
+    test_step.dependOn(&b.addRunArtifact(b.addTest(.{ .root_module = grid })).step);
+}
+
+fn addExample(
+    b: *std.Build,
+    comptime name: []const u8,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+    linopic: *std.Build.Module,
+    raylib: *std.Build.Step.Compile,
+) *std.Build.Step.Compile {
+    const mod = b.createModule(.{
+        .root_source_file = b.path("examples/" ++ name ++ ".zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{.{ .name = "linopic", .module = linopic }},
+    });
+    mod.linkLibrary(raylib);
+    const exe = b.addExecutable(.{ .name = name, .root_module = mod });
+    b.installArtifact(exe);
+    return exe;
 }

@@ -3,7 +3,12 @@
     .version = "0.0.0",
     .fingerprint = 0x8fb30158873032f0,
     .minimum_zig_version = "0.15.2",
-    .dependencies = .{},
+    .dependencies = .{
+        .raylib = .{
+            .url = "git+https://github.com/raysan5/raylib.git#afe74c1c707a7c0d9499fb63f0120466c719c6fe",
+            .hash = "raylib-5.6.0-dev-whq8uNYpDQV7_-rZkjRxTqzy2AZb_TALE6fxWskBl_Vz",
+        },
+    },
     .paths = .{
         "build.zig",
         "build.zig.zon",

@@ -326,7 +326,6 @@ fn oscWaveformColor(value: u8) lnpc.Color {
     };
 }
 
-
 // =============================================================================
 // Subgrid Management
 // =============================================================================
@@ -496,10 +495,22 @@ fn updateContiguousValue(sg: *SubGrid, start_x: u32, start_y: u32, mod_type: Mod
         cell.value = value;
 
         if (stack_len < 60) {
-            if (pos.x > 0) { stack[stack_len] = .{ .x = pos.x - 1, .y = pos.y }; stack_len += 1; }
-            if (pos.x < WIDTH - 1) { stack[stack_len] = .{ .x = pos.x + 1, .y = pos.y }; stack_len += 1; }
-            if (pos.y > 0) { stack[stack_len] = .{ .x = pos.x, .y = pos.y - 1 }; stack_len += 1; }
-            if (pos.y < HEIGHT - 1) { stack[stack_len] = .{ .x = pos.x, .y = pos.y + 1 }; stack_len += 1; }
+            if (pos.x > 0) {
+                stack[stack_len] = .{ .x = pos.x - 1, .y = pos.y };
+                stack_len += 1;
+            }
+            if (pos.x < WIDTH - 1) {
+                stack[stack_len] = .{ .x = pos.x + 1, .y = pos.y };
+                stack_len += 1;
+            }
+            if (pos.y > 0) {
+                stack[stack_len] = .{ .x = pos.x, .y = pos.y - 1 };
+                stack_len += 1;
+            }
+            if (pos.y < HEIGHT - 1) {
+                stack[stack_len] = .{ .x = pos.x, .y = pos.y + 1 };
+                stack_len += 1;
+            }
         }
     }
 }
@@ -1004,10 +1015,22 @@ fn drawStatusBar() void {
                     }
 
                     if (stack_len < 60) {
-                        if (p.px > 0) { stack[stack_len] = .{ .px = p.px - 1, .py = p.py }; stack_len += 1; }
-                        if (p.px < WIDTH - 1) { stack[stack_len] = .{ .px = p.px + 1, .py = p.py }; stack_len += 1; }
-                        if (p.py > 0) { stack[stack_len] = .{ .px = p.px, .py = p.py - 1 }; stack_len += 1; }
-                        if (p.py < HEIGHT - 1) { stack[stack_len] = .{ .px = p.px, .py = p.py + 1 }; stack_len += 1; }
+                        if (p.px > 0) {
+                            stack[stack_len] = .{ .px = p.px - 1, .py = p.py };
+                            stack_len += 1;
+                        }
+                        if (p.px < WIDTH - 1) {
+                            stack[stack_len] = .{ .px = p.px + 1, .py = p.py };
+                            stack_len += 1;
+                        }
+                        if (p.py > 0) {
+                            stack[stack_len] = .{ .px = p.px, .py = p.py - 1 };
+                            stack_len += 1;
+                        }
+                        if (p.py < HEIGHT - 1) {
+                            stack[stack_len] = .{ .px = p.px, .py = p.py + 1 };
+                            stack_len += 1;
+                        }
                     }
                 }
             }
@@ -1237,10 +1260,22 @@ fn traceSignal(sg: *SubGrid, x: u32, y: u32, sample_rate: f32) f32 {
                 }
 
                 if (stack_len < 60) {
-                    if (pos.px > 0) { stack[stack_len] = .{ .px = pos.px - 1, .py = pos.py }; stack_len += 1; }
-                    if (pos.px < WIDTH - 1) { stack[stack_len] = .{ .px = pos.px + 1, .py = pos.py }; stack_len += 1; }
-                    if (pos.py > 0) { stack[stack_len] = .{ .px = pos.px, .py = pos.py - 1 }; stack_len += 1; }
-                    if (pos.py < HEIGHT - 1) { stack[stack_len] = .{ .px = pos.px, .py = pos.py + 1 }; stack_len += 1; }
+                    if (pos.px > 0) {
+                        stack[stack_len] = .{ .px = pos.px - 1, .py = pos.py };
+                        stack_len += 1;
+                    }
+                    if (pos.px < WIDTH - 1) {
+                        stack[stack_len] = .{ .px = pos.px + 1, .py = pos.py };
+                        stack_len += 1;
+                    }
+                    if (pos.py > 0) {
+                        stack[stack_len] = .{ .px = pos.px, .py = pos.py - 1 };
+                        stack_len += 1;
+                    }
+                    if (pos.py < HEIGHT - 1) {
+                        stack[stack_len] = .{ .px = pos.px, .py = pos.py + 1 };
+                        stack_len += 1;
+                    }
                 }
             }
 
@@ -1252,10 +1287,10 @@ fn traceSignal(sg: *SubGrid, x: u32, y: u32, sample_rate: f32) f32 {
                 // Single-cell mode: color = waveform, value = frequency
                 switch (cell.port_type) {
                     .ctrl_a => waveform = 0, // cyan = sine
-                    .ctrl_b => waveform = 1,   // magenta = saw
-                    .ctrl_c => waveform = 2,   // green = square
-                    .ctrl_d => waveform = 3,    // yellow = triangle
-                    else => waveform = 0,       // white/red default to sine
+                    .ctrl_b => waveform = 1, // magenta = saw
+                    .ctrl_c => waveform = 2, // green = square
+                    .ctrl_d => waveform = 3, // yellow = triangle
+                    else => waveform = 0, // white/red default to sine
                 }
                 base_freq = 55.0 * std.math.pow(f32, 2.0, @as(f32, @floatFromInt(cell.value)) / 64.0);
             }
@@ -1324,8 +1359,7 @@ fn traceSignal(sg: *SubGrid, x: u32, y: u32, sample_rate: f32) f32 {
                         else if (src_cell.module_type == .tempo) blk: {
                             const bpm = 40.0 + @as(f32, @floatFromInt(src_cell.value)) / 255.0 * 160.0;
                             break :blk bpm / 120.0; // normalize around 120bpm
-                        } else
-                            traceSignal(sg, conn.src_x, conn.src_y, sample_rate) * 0.5 + 0.5;
+                        } else traceSignal(sg, conn.src_x, conn.src_y, sample_rate) * 0.5 + 0.5;
 
                         switch (check_cell.port_type) {
                             .ctrl_a => base_rate = 0.1 + cv * 19.9, // cyan = rate
@@ -1349,10 +1383,22 @@ fn traceSignal(sg: *SubGrid, x: u32, y: u32, sample_rate: f32) f32 {
                 }
 
                 if (stack_len < 60) {
-                    if (pos.px > 0) { stack[stack_len] = .{ .px = pos.px - 1, .py = pos.py }; stack_len += 1; }
-                    if (pos.px < WIDTH - 1) { stack[stack_len] = .{ .px = pos.px + 1, .py = pos.py }; stack_len += 1; }
-                    if (pos.py > 0) { stack[stack_len] = .{ .px = pos.px, .py = pos.py - 1 }; stack_len += 1; }
-                    if (pos.py < HEIGHT - 1) { stack[stack_len] = .{ .px = pos.px, .py = pos.py + 1 }; stack_len += 1; }
+                    if (pos.px > 0) {
+                        stack[stack_len] = .{ .px = pos.px - 1, .py = pos.py };
+                        stack_len += 1;
+                    }
+                    if (pos.px < WIDTH - 1) {
+                        stack[stack_len] = .{ .px = pos.px + 1, .py = pos.py };
+                        stack_len += 1;
+                    }
+                    if (pos.py > 0) {
+                        stack[stack_len] = .{ .px = pos.px, .py = pos.py - 1 };
+                        stack_len += 1;
+                    }
+                    if (pos.py < HEIGHT - 1) {
+                        stack[stack_len] = .{ .px = pos.px, .py = pos.py + 1 };
+                        stack_len += 1;
+                    }
                 }
             }
 
@@ -1364,10 +1410,10 @@ fn traceSignal(sg: *SubGrid, x: u32, y: u32, sample_rate: f32) f32 {
                 // Single-cell mode: color = waveform, value = rate
                 switch (cell.port_type) {
                     .ctrl_a => waveform = 0, // cyan = sine
-                    .ctrl_b => waveform = 1,   // magenta = saw
-                    .ctrl_c => waveform = 2,   // green = square
-                    .ctrl_d => waveform = 3,    // yellow = triangle
-                    else => waveform = 0,       // white/red default to sine
+                    .ctrl_b => waveform = 1, // magenta = saw
+                    .ctrl_c => waveform = 2, // green = square
+                    .ctrl_d => waveform = 3, // yellow = triangle
+                    else => waveform = 0, // white/red default to sine
                 }
                 base_rate = 0.1 + @as(f32, @floatFromInt(cell.value)) / 255.0 * 19.9;
             }
@@ -1419,9 +1465,9 @@ fn traceSignal(sg: *SubGrid, x: u32, y: u32, sample_rate: f32) f32 {
                 // Determine filter type from port colors present
                 switch (check_cell.port_type) {
                     .ctrl_a => filter_type = 0, // cyan = lowpass
-                    .ctrl_b => filter_type = 1,   // magenta = highpass
-                    .ctrl_c => filter_type = 2,   // green = bandpass
-                    .ctrl_d => filter_type = 3,    // yellow = notch
+                    .ctrl_b => filter_type = 1, // magenta = highpass
+                    .ctrl_c => filter_type = 2, // green = bandpass
+                    .ctrl_d => filter_type = 3, // yellow = notch
                     else => {},
                 }
 
@@ -1447,10 +1493,22 @@ fn traceSignal(sg: *SubGrid, x: u32, y: u32, sample_rate: f32) f32 {
 
                 // Add neighbors to stack
                 if (stack_len < 60) {
-                    if (pos.x > 0) { stack[stack_len] = .{ .x = pos.x - 1, .y = pos.y }; stack_len += 1; }
-                    if (pos.x < WIDTH - 1) { stack[stack_len] = .{ .x = pos.x + 1, .y = pos.y }; stack_len += 1; }
-                    if (pos.y > 0) { stack[stack_len] = .{ .x = pos.x, .y = pos.y - 1 }; stack_len += 1; }
-                    if (pos.y < HEIGHT - 1) { stack[stack_len] = .{ .x = pos.x, .y = pos.y + 1 }; stack_len += 1; }
+                    if (pos.x > 0) {
+                        stack[stack_len] = .{ .x = pos.x - 1, .y = pos.y };
+                        stack_len += 1;
+                    }
+                    if (pos.x < WIDTH - 1) {
+                        stack[stack_len] = .{ .x = pos.x + 1, .y = pos.y };
+                        stack_len += 1;
+                    }
+                    if (pos.y > 0) {
+                        stack[stack_len] = .{ .x = pos.x, .y = pos.y - 1 };
+                        stack_len += 1;
+                    }
+                    if (pos.y < HEIGHT - 1) {
+                        stack[stack_len] = .{ .x = pos.x, .y = pos.y + 1 };
+                        stack_len += 1;
+                    }
                 }
             }
 
@@ -1512,10 +1570,22 @@ fn traceSignal(sg: *SubGrid, x: u32, y: u32, sample_rate: f32) f32 {
 
                 // Add neighbors
                 if (stack_len < 60) {
-                    if (pos.x > 0) { stack[stack_len] = .{ .x = pos.x - 1, .y = pos.y }; stack_len += 1; }
-                    if (pos.x < WIDTH - 1) { stack[stack_len] = .{ .x = pos.x + 1, .y = pos.y }; stack_len += 1; }
-                    if (pos.y > 0) { stack[stack_len] = .{ .x = pos.x, .y = pos.y - 1 }; stack_len += 1; }
-                    if (pos.y < HEIGHT - 1) { stack[stack_len] = .{ .x = pos.x, .y = pos.y + 1 }; stack_len += 1; }
+                    if (pos.x > 0) {
+                        stack[stack_len] = .{ .x = pos.x - 1, .y = pos.y };
+                        stack_len += 1;
+                    }
+                    if (pos.x < WIDTH - 1) {
+                        stack[stack_len] = .{ .x = pos.x + 1, .y = pos.y };
+                        stack_len += 1;
+                    }
+                    if (pos.y > 0) {
+                        stack[stack_len] = .{ .x = pos.x, .y = pos.y - 1 };
+                        stack_len += 1;
+                    }
+                    if (pos.y < HEIGHT - 1) {
+                        stack[stack_len] = .{ .x = pos.x, .y = pos.y + 1 };
+                        stack_len += 1;
+                    }
                 }
             }
 
@@ -1593,10 +1663,22 @@ fn traceSignal(sg: *SubGrid, x: u32, y: u32, sample_rate: f32) f32 {
 
                 // Add neighbors
                 if (stack_len < 60) {
-                    if (pos.gx > 0) { stack[stack_len] = .{ .gx = pos.gx - 1, .gy = pos.gy }; stack_len += 1; }
-                    if (pos.gx < WIDTH - 1) { stack[stack_len] = .{ .gx = pos.gx + 1, .gy = pos.gy }; stack_len += 1; }
-                    if (pos.gy > 0) { stack[stack_len] = .{ .gx = pos.gx, .gy = pos.gy - 1 }; stack_len += 1; }
-                    if (pos.gy < HEIGHT - 1) { stack[stack_len] = .{ .gx = pos.gx, .gy = pos.gy + 1 }; stack_len += 1; }
+                    if (pos.gx > 0) {
+                        stack[stack_len] = .{ .gx = pos.gx - 1, .gy = pos.gy };
+                        stack_len += 1;
+                    }
+                    if (pos.gx < WIDTH - 1) {
+                        stack[stack_len] = .{ .gx = pos.gx + 1, .gy = pos.gy };
+                        stack_len += 1;
+                    }
+                    if (pos.gy > 0) {
+                        stack[stack_len] = .{ .gx = pos.gx, .gy = pos.gy - 1 };
+                        stack_len += 1;
+                    }
+                    if (pos.gy < HEIGHT - 1) {
+                        stack[stack_len] = .{ .gx = pos.gx, .gy = pos.gy + 1 };
+                        stack_len += 1;
+                    }
                 }
             }
 
